@@ -20,19 +20,23 @@
 #include <float.h>
 #include <math.h>
 
+// The below files are part of the GDAL library, which needs to be downloaded and installed
 #include "gdal.h" // note this is a different header file to the c++ version
 #include "cpl_conv.h" // for CPLMalloc()
 #include "cpl_string.h"
 #include "ogr_core.h"
 #include "ogr_srs_api.h"
 
+// found in ${CUDA_HOME}/inc
 #include <cuda.h>
-#include "helper_cuda.h"
 #include <device_functions.h>
-#include "helper_timer.h"
-#include "helper_functions.h"
-#include "cuda_runtime.h"
+#include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+
+// found in ${CUDA_HOME}/samples/common/inc. These should be <> not "", and then included during compilation.
+#include <helper_functions.h>
+#include <helper_timer.h>
+#include <helper_cuda.h>
 
 #include <thrust/system_error.h>
 #include <thrust/device_ptr.h>

@@ -1,0 +1,14 @@
+syntax: glob
+x64/Release/weathering.obj
+.DS_Store
+
+lem
+
+Output
+
+data
+
+*.o
+
+*.orig
+

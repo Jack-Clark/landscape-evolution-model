@@ -24,6 +24,8 @@
 
 void accumulateflowSFD(Data* data, Data* device, int iter);
 
+int process_SFD_NoPart_List(Data* data, Data* device, int iter);
+
 void correctflow_SFD_NoPart_List(Data* data, Data* device, int iter);
 
 
