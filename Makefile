@@ -8,7 +8,7 @@ SRC           := $(foreach sdir,$(SRC_DIR),$(wildcard $(sdir)/*.cu))
 OBJ           := $(patsubst %.cu,build/%.o,$(SRC))
 HEADERS       := headers $(CUDA_HOME)/include $(CUDA_HOME)/samples/common/inc
 INCLUDES      := $(addprefix -I,$(HEADERS))
-SHARED_LIBS   := $(addprefix -L, /usr/local/lib)
+#SHARED_LIBS   := $(addprefix -L, /usr/local/lib/libgdal.so)
 
 # vpath %.cu $(SRC_DIR) 
 
@@ -22,7 +22,7 @@ build/%.o: %.cu
 all: checkdirs build/lem
 
 build/lem: $(OBJ)
-	$(NVCC) $(SHARED_LIBS) $^ -o $@
+	$(NVCC) $^ -o $@ -lgdal
 
 
 checkdirs: $(BUILD_DIR)
