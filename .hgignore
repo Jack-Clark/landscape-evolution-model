@@ -13,3 +13,5 @@ data
 *.orig
 
 build
+
+summarydata

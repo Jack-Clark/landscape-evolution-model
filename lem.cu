@@ -58,13 +58,12 @@ int main(int argc, char* argv[]) {
 
 	data.flowdirectiontype = 0; // 0 for SFD and 1 for MFD
 	data.WhichGrid = 8 ;// currently only works up to 25 million cell grid
-	data.max_iterations = 140000;
+	data.max_iterations = 5;
 	data.outfiles = 1; // only option at present!
 
 	// new parameters to adjust vegetation response
 	data.temp_inflex = 6. ;
 	data.temp_sens = 6.;
-
 
 	sprintf(logfile, "output%d/logfile_%dm_%d.txt", data.usethisgpu, data.WhichGrid, data.max_iterations);
 
@@ -75,18 +74,16 @@ int main(int argc, char* argv[]) {
 	fprintf(data.outlog,"Memory on CUDA card free at start of iteration: %d total: %d\n",freenow/1024,total/1024);
 	
 	startrun = clock();
-
 	switch (data.WhichGrid)
 	{
 
 		case 8:
-			file = "inputgrids/thames20m.asc"; // this is the modified 20m DEM i.e. given an outlet cell
-			maskfile = "inputgrids/20mMask.tif"; // this is the mask file
+			file = "../inputgrids/thames20m.asc"; // this is the modified 20m DEM i.e. given an outlet cell
+			maskfile = "../inputgrids/20mMask.tif"; // this is the mask file
 			//totgridsize = 8666880  2928 cols, 2960 rows
 			break;
 	}
-
-	clim_file = "inputdata/SSTbase.txt";
+	clim_file = "../inputdata/SSTbase.txt";
 		
 
 	fprintf(data.outlog,"Landscape file   = %s\n", file);
@@ -251,7 +248,9 @@ int main(int argc, char* argv[]) {
 		printf("Finished Iteration %d\n", i);
 		fprintf(data.outlog,"Finished Iteration %d\n", i);
 		//printf("Here\n");
+		printf("\nIteration logged\n");
 		writeSummaryDataToFile(&data, data.outfiles, i); // note summary output is every iteration with argument of 1, 2, 5 or 10 only
+		printf("\nSummary logged\n");
 		zerogrids(&data);
 		//printf("herer2\n");
 		clearDeviceSpace(&data, &device);
