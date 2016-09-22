@@ -8,14 +8,10 @@ SRC           := $(foreach sdir,$(SRC_DIR),$(wildcard $(sdir)/*.cu))
 OBJ           := $(patsubst %.cu,build/%.o,$(SRC))
 HEADERS       := headers $(CUDA_HOME)/include $(CUDA_HOME)/samples/common/inc
 INCLUDES      := $(addprefix -I,$(HEADERS))
-#SHARED_LIBS   := $(addprefix -L, /usr/local/lib/libgdal.so)
 
-# vpath %.cu $(SRC_DIR) 
 
-#define make-goal
 build/%.o: %.cu
 	$(NVCC) $(INCLUDES) -c $< -o $@
-#endef
 
 .PHONY: all checkdirs clean
 
@@ -32,5 +28,3 @@ $(BUILD_DIR):
 
 clean:
 	@rm -rf build
-
-#$(foreach bdir,$(BUILD_DIR),$(eval $(call make-goal,$(bdir))))
