@@ -1,9 +1,13 @@
 #include "FA_SFD.h"
 
+__global__ void kernelfunction_SFD_Initital_Compute_Deps_And_Resolve_Zero_Deps(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int *dep) {
 
-__global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, unsigned int* left)
-{
-	//int self = blockIdx.y*cols*BLOCKROWS + blockIdx.x*BLOCKCOLS + threadIdx.y*cols + threadIdx.x;
+	// The number of neighbour cells flowing into this cell
+	int depCount = 0;
+
+	// number of neighbours that have had their FA calculated
+ 	int numNeighboursReady = 0;
+
 	int irow = blockIdx.y * blockDim.y + threadIdx.y;
 	int icol = blockIdx.x * blockDim.x + threadIdx.x;
 	int maxSize = rows * cols;
@@ -13,6 +17,7 @@ __global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, i
 
 	int self = irow * cols + icol;
 	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+
 	int nie, nise, nis, nisw, niw, ninw, nin, nine;
 
 	double accum = 1.0 * weights[self];
@@ -26,93 +31,87 @@ __global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, i
 	nin  = self - cols     ;
 	nine = self - cols + 1 ;
 
-	unsigned int myPos = 0;
-
 	if (icol < cols - 1 && fd[nie] & WEST) {
-		if (fa[nie] < 0) {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
+		depCount++;
+		if (fa[nie] >= 0) {
+			numNeighboursReady++;
+			accum += fa[nie];
 		}
-		accum += fa[nie];
 	}
-	if (icol < cols - 1 && irow < rows - 1 && fd[nise] & NORTHWEST) {
-		if (fa[nise] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
+	if (icol < cols - 1 && fd[nise] & NORTHWEST) {
+		depCount++;
+		if (fa[nise] >= 0) {
+			numNeighboursReady++;
+			accum += fa[nise];
+		} 
+	}
+	if (icol < cols - 1 && fd[nis] & NORTH) {
+		depCount++;
+		if (fa[nis] >= 0) {
+			numNeighboursReady++;
+			accum += fa[nis];
 		}
+	}
+	if (icol < cols - 1 && fd[nisw] & NORTHEAST) {
+		depCount++;
+		if (fa[nisw] >= 0) {
+			numNeighboursReady++;
+			accum += fa[nisw];
+		}
+	}
+	if (icol < cols - 1 && fd[niw] & EAST) {
+		depCount++;
+		if (fa[niw] >= 0) {
+			numNeighboursReady++;
+			accum += fa[niw];
+		}
+	}
+	if (icol < cols - 1 && fd[ninw] & SOUTHEAST) {
+		depCount++;
+		if (fa[ninw] >= 0) {
+			numNeighboursReady++;
+			accum += fa[ninw];
+		} 
+	}
+	if (icol < cols - 1 && fd[nin] & SOUTH) {
+		depCount++;
+		if (fa[nis] >= 0) {
+			numNeighboursReady++;
+			accum += fa[nis];
+		}
+	}
+	if (icol < cols - 1 && fd[nine] & SOUTHWEST) {
+		depCount++;
+		if (fa[nine] >= 0) {
+			numNeighboursReady++;
+			accum += fa[nine];
+		}
+	}
 
-		accum += fa[nise];
+	if((depCount - numNeighboursReady) == 0) {
+		fa[self] = accum;
+	} else {
+		atomicInc(pkgprogressd, maxSize);
 	}
-	if (irow < rows - 1 && fd[nis] & NORTH) {
-		if (fa[nis] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
-		}
-		accum += fa[nis];
-	}
-	if (icol > 0 && irow < rows - 1 && fd[nisw] & NORTHEAST) {
-		if (fa[nisw] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
-		}
-
-		accum += fa[nisw];
-	}
-	if (icol > 0 && fd[niw] & EAST) {
-		if (fa[niw] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
-		}
-
-		accum += fa[niw];
-	}
-	if (icol > 0 && irow > 0 && fd[ninw] & SOUTHEAST) {
-		if (fa[ninw] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
-		}
-
-		accum += fa[ninw];
-	}
-	if (irow > 0 && fd[nin] & SOUTH) {
-		if (fa[nin] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
-		}
-
-		accum += fa[nin];
-	}
-	if (irow > 0 && icol < cols - 1 && fd[nine] & SOUTHWEST) {
-		if (fa[nine] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
-			return;
-		}
-
-		accum += fa[nine];
-	}
-	fa[self] = accum;
+	dep[self] = depCount;
 }
 
-__global__ void kernelfunction_SFD_NoPart_ListProgress(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, unsigned int* left, unsigned int* had, int hadsize)
-{
-	int pos = blockIdx.y*cols*blockDim.y + blockIdx.x*blockDim.x + threadIdx.y*cols + threadIdx.x;
+
+__global__ void kernelfunction_SFD_Resolve_Zero_Dependencies(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd) {
+
+	int irow = blockIdx.y * blockDim.y + threadIdx.y;
+	int icol = blockIdx.x * blockDim.x + threadIdx.x;
 	int maxSize = rows * cols;
 
-	int nie, nise, nis, nisw, niw, ninw, nin, nine;
-
-	if (pos >= hadsize)
+	if (irow >= rows || icol >= cols)
 		return;
 
-	int self = had[pos];
-//	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+	int self = irow * cols + icol;
+	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+
+	if(fa[self] >= 0) return;
+
+	int nie, nise, nis, nisw, niw, ninw, nin, nine;
 
 	double accum = 1.0 * weights[self];
 
@@ -125,87 +124,96 @@ __global__ void kernelfunction_SFD_NoPart_ListProgress(int *mask, int *fd, doubl
 	nin  = self - cols     ;
 	nine = self - cols + 1 ;
 
-	int myPos = 0;
-
-	int icol = self % cols;
-	int irow = self / cols;
-
 	if (icol < cols - 1 && fd[nie] & WEST) {
 		if (fa[nie] < 0) {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
 		accum += fa[nie];
 	}
-	if (icol < cols - 1 && irow < rows - 1 && fd[nise] & NORTHWEST) {
-		if (fa[nise] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+	if (icol < cols - 1 && fd[nise] & NORTHWEST) {
+		if (fa[nise] < 0) {
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
-
 		accum += fa[nise];
 	}
-	if (irow < rows - 1 && fd[nis] & NORTH) {
-		if (fa[nis] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+	if (icol < cols - 1 && fd[nis] & NORTH) {
+		if (fa[nis] < 0) {
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
 		accum += fa[nis];
 	}
-	if (icol > 0 && irow < rows - 1 && fd[nisw] & NORTHEAST) {
-		if (fa[nisw] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+	if (icol < cols - 1 && fd[nisw] & NORTHEAST) {
+		if (fa[nisw] < 0) {
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
-
 		accum += fa[nisw];
 	}
-	if (icol > 0 && fd[niw] & EAST) {
-		if (fa[niw] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+	if (icol < cols - 1 && fd[niw] & EAST) {
+		if (fa[niw] < 0) {
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
-
 		accum += fa[niw];
 	}
-	if (icol > 0 && irow > 0 && fd[ninw] & SOUTHEAST) {
-		if (fa[ninw] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+	if (icol < cols - 1 && fd[ninw] & SOUTHEAST) {
+		if (fa[ninw] < 0) {
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
-
 		accum += fa[ninw];
 	}
-	if (irow > 0 && fd[nin] & SOUTH) {
-		if (fa[nin] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+	if (icol < cols - 1 && fd[nin] & SOUTH) {
+		if (fa[nis] < 0) {
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
-
-		accum += fa[nin];
+		accum += fa[nis];
 	}
-	if (irow > 0 && icol < cols - 1 && fd[nine] & SOUTHWEST) {
-		if (fa[nine] < 0)  {
-			myPos = atomicInc(pkgprogressd, maxSize);
-		    left[myPos] = self;
+	if (icol < cols - 1 && fd[nine] & SOUTHWEST) {
+		if (fa[nine] < 0) {
+			atomicInc(pkgprogressd, maxSize);
 			return;
 		}
-
 		accum += fa[nine];
 	}
-	fa[self] = accum;
 
+	fa[self] = accum;
 }
 
 
-int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
+__global__ void kernelfunction_SFD_Resolve_Single_Dependencies(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int *dep, int *neighbourOffset) {
+
+	int irow = blockIdx.y * blockDim.y + threadIdx.y;
+	int icol = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (irow >= rows || icol >= cols)
+		return;
+
+	int self = irow * cols + icol;
+	
+	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+
+	if(fa[self] > 0) return;
+
+	int nextCellInFlow = self + neighbourOffset[__ffs(fd[self]) - 1];
+	int currentCell = self;
+
+	while(dep[nextCellInFlow] == 1 && fa[nextCellInFlow] < 0) {
+		fa[nextCellInFlow] = 1.0 * weights[nextCellInFlow];
+		fa[nextCellInFlow] += fa[currentCell];
+		currentCell = nextCellInFlow;
+		nextCellInFlow = currentCell + neighbourOffset[__ffs(fd[nextCellInFlow]) - 1];
+		atomicDec(pkgprogressd, 0);
+	}
+}
+
+
+
+int mod_process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	printf("In process\n");
 
     int gridRows = data->mapInfo.height;
@@ -221,73 +229,50 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 
 	checkCudaErrors(cudaMemcpy(progress_d, progress_h, sizeof(unsigned int), cudaMemcpyHostToDevice));
 
-	// Pull straight back
-//	checkCudaErrors(cudaMemcpy(progress_h, progress_d. sizeof(unsigned int), cudaMemcpyDeviceToHost));
+	int *dependencyMap;
+	int *neighbourOffset_d;
+	int neighbourOffset_h[] = {1, gridColumns+1, gridColumns, gridColumns-1, -1, -gridColumns-1, -gridColumns, -gridColumns+1};
+	checkCudaErrors(cudaMalloc((void **) &dependencyMap, fullsize * sizeof(int)));
+	checkCudaErrors(cudaMalloc((void **) &neighbourOffset_d, sizeof(neighbourOffset_h)/sizeof(int)));
 
-
-	unsigned int* list1;
-	unsigned int* list2;
-	unsigned int* listT;
-	checkCudaErrors(cudaMalloc((void **) &list1, fullsize * sizeof(unsigned int)) ); //FIXME - need to figure out a way to set this value
-	checkCudaErrors(cudaMalloc((void **) &list2, fullsize * sizeof(unsigned int)) ); //FIXME - need to figure out a way to set this value
-	//checkCudaErrors(cudaMalloc((void **) &listT, sizeof(unsigned int)) );
-
-	//printf("ListT = %x\n", listT);
+	checkCudaErrors(cudaMemcpy(neighbourOffset_d, neighbourOffset_h, sizeof(neighbourOffset_h)/sizeof(int), cudaMemcpyHostToDevice));
 
 	dim3 dimGrid(grid1, grid2);
 	dim3 dimBlock(BLOCKCOLS, BLOCKROWS);
-
-	//printf(":%s\n", cudaGetErrorString(cudaGetLastError()));
-
 
 	// first run a kernel to solve those cells which are on the edges and produce the first list
 
 	//__global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int* left)
 
-	kernelfunction_SFD_NoPart_List<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, list1);
+	kernelfunction_SFD_Initital_Compute_Deps_And_Resolve_Zero_Deps<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap);
 
-	//printf(":First kernel function %s\n", cudaGetErrorString(cudaGetLastError()));
-
-
+	kernelfunction_SFD_Resolve_Single_Dependencies<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
+	
 	// get the size of the array
 	checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 
 	unsigned int lastTot = gridRows * gridColumns;
-
-	//printf("starting loop left=%d\n", *progress_h);
-	//printf("max left = %d\n", lastTot);
-
 	unsigned int* temp = (unsigned int*) malloc(sizeof(unsigned int));
 
-	int nextBlocks;
-
 	while (*progress_h > 0) { // while the array still has elements
-		// Swap list 1 and list 2
-		listT = list1;
-		list1 = list2;
-		list2 = listT;
+		
 		//printf("Cells left to process = %d\n", *progress_h);
 		if (*progress_h > lastTot) {
 			printf("The number of incorrect cells should be coming down!\n");
 			scanf("%d", &lastTot);
 		}
 		lastTot = *progress_h;
-		// call kernel to process the list
-		nextBlocks = *progress_h / 128 + 1;
 
 		// reset the value of progressed before restarting
-
 		*temp = 0;
 		checkCudaErrors(cudaMemcpy(progress_d, temp, sizeof(unsigned int), cudaMemcpyHostToDevice) );
 		//__global__ void kernelfunction_SFD_NoPart_ListProgress(int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int* left, int* had, int hadsize)
-		kernelfunction_SFD_NoPart_ListProgress<<<nextBlocks, 128>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, list1, list2, *progress_h);
+		kernelfunction_SFD_Resolve_Zero_Dependencies<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d);
 
-		//cudaDeviceSynchronize();
-		//printf(":loop kernel function %s\n", cudaGetErrorString(cudaGetLastError()));
+		kernelfunction_SFD_Resolve_Single_Dependencies<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
 
 		// get the new cell count
 		checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
-		//printf("Left= %d\n", *progress_h);
 	}
 
 	free(temp);
@@ -330,18 +315,15 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	for (int i = 0; i < gridRows; i++) {
 		for (int j = 0; j < gridColumns; j++) {
 				if (data->fa[i * gridColumns + j] < 0) {
-				//if (count < 20)
-					//printf("[%d,%d] = %8.7f\n", i, j, data->fa[i * ncell_x + j]);
 				count++;
 				}
 		}
 	}
 	fprintf(data->outlog, "FA: Bad value count (i.e. not in catchment(s) = %d\n", count);
 
-	cudaFree(list1);
-	cudaFree(list2);
-	//cudaFree(listT);
 	cudaFree(progress_d);
+	cudaFree(dependencyMap);
+	cudaFree(neighbourOffset_d);
 
 	free(progress_h);
 
@@ -349,15 +331,13 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	return 1;
 }
 
-void correctflow_SFD_NoPart_List(Data* data, Data* device, int iter) {
+void mod_correctflow_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	if (cudaSuccess != cudaSetDevice(CUDA_DEVICE)) {
 		printf("Unable to access CUDA card\n");
 		return ;
 	}
 
 	int x;
-
-	//printf("nrows = %d ncols = %d\n", nrows, ncols);
 	cudaEvent_t start, stop;
 	float time;
     int gridRows = data->mapInfo.height;
@@ -379,7 +359,7 @@ void correctflow_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 
-	process_SFD_NoPart_List(data, device, iter);
+	mod_process_SFD_NoPart_List(data, device, iter);
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);

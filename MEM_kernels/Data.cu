@@ -344,6 +344,10 @@ int writeSummaryDataToFile(Data* data, int howmany, int iteration)
 			if (iteration == 1)
 			{
 				out1 = fopen(outfile1, "w");
+				if(!out1) {
+					printf("\nThe file %s couldn't be opened for writing", outfile1);
+					exit(0);
+				}
 				fprintf(out1, "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s \n",
 						      "iteration","year", "temp", "rain", "diffuse", "concentrated", "gelifluction", "chemicalW", "physicalW", "deposition", "totbio", "FA_max", "sedoutflow", "waterout", "sinkcount");
 				fclose(out1);

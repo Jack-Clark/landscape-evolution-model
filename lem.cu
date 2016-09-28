@@ -69,6 +69,10 @@ int main(int argc, char* argv[]) {
 
 	data.logfileOut = logfile;
 	data.outlog = fopen(data.logfileOut, "w");
+	if(!data.outlog) {
+		printf("\nThe file: %s failed to open.", data.logfileOut);
+		exit(0);
+	}
 	fprintf(data.outlog, "logfile:  grid:%dm_   Max_iterations:%d. \n",data.WhichGrid, data.max_iterations);
 	cudaMemGetInfo(&freenow, &total);
 	fprintf(data.outlog,"Memory on CUDA card free at start of iteration: %d total: %d\n",freenow/1024,total/1024);
@@ -121,10 +125,10 @@ int main(int argc, char* argv[]) {
     int runiniter; // how many on default rain and temp set above
     int totalnumiter;
 
-    runiniter = 500;
+    runiniter = 10;
     start_pos_sim = 0; //  140k dataset
     *data.start_year = start_pos_sim;
-    end_pos_sim = 135000;
+    end_pos_sim = 10;
 
     totalnumiter = runiniter + (end_pos_sim-start_pos_sim);
 
