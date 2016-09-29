@@ -252,12 +252,12 @@ int mod_process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	unsigned int iterationCount = 0;
 
 	kernelfunction_SFD_Initital_Compute_Deps_And_Calculate_Zero_Dep_Cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap);
-	assert(cudaGetLastError() == cudaSuccess):
+	assert(cudaGetLastError() == cudaSuccess);
 
 	kernelfunction_SFD_Calculate_Single_Dependency_Chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
-	assert(cudaGetLastError() == cudaSuccess):
+	assert(cudaGetLastError() == cudaSuccess);
 
-	checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(progress_h), cudaMemcpyDeviceToHost));
+	checkCudaErrors(cudaMemcpy(&progress_h, progress_d, sizeof(progress_h), cudaMemcpyDeviceToHost));
 
 	iterationCount++;
 	unsigned int lastTot = gridRows * gridColumns;
@@ -275,10 +275,10 @@ int mod_process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 
 
 		kernelfunction_SFD_Calculate_Zero_Dependency_Cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d);
-		assert(cudaGetLastError() == cudaSuccess):
+		assert(cudaGetLastError() == cudaSuccess);
 
 		kernelfunction_SFD_Calculate_Single_Dependency_Chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
-		assert(cudaGetLastError() == cudaSuccess):
+		assert(cudaGetLastError() == cudaSuccess);
 
 		checkCudaErrors(cudaMemcpy(&progress_h, progress_d, sizeof(progress_h), cudaMemcpyDeviceToHost));
 	}
