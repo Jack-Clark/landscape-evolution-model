@@ -28,5 +28,7 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter);
 
 void correctflow_SFD_NoPart_List(Data* data, Data* device, int iter);
 
+void mod_correctflow_SFD_NoPart_List(Data* data, Data* device, int iter);
+
 
 #endif /* FA_SFD_H_ */

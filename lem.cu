@@ -116,7 +116,10 @@ int main(int argc, char* argv[]) {
 
 	// Perform the iterations
     printf("Performing the simulation\n");
+
     fprintf(data.outlog, "Performing the simulation\n");
+
+    fflush(data.outlog);
 
     data.max_iterations = 135000;
 
@@ -127,10 +130,15 @@ int main(int argc, char* argv[]) {
 
     runiniter = 10;
     start_pos_sim = 0; //  140k dataset
+    printf("Getting to before weird pointer\n");
+
+    data.start_year = (int *) malloc(sizeof(int));
     *data.start_year = start_pos_sim;
+    printf("Getting to after weird pointer\n");
     end_pos_sim = 10;
 
     totalnumiter = runiniter + (end_pos_sim-start_pos_sim);
+
 
 	for (int i = 1; i < totalnumiter + 1; i++) {
 
@@ -168,7 +176,7 @@ int main(int argc, char* argv[]) {
 		// ****************************************  SFD   ****************************************************
 		printf("Entering FA: \n");
 		//accumulateflowSFD(&data, &device, i);
-		correctflow_SFD_NoPart_List(&data, &device, i);
+		mod_correctflow_SFD_NoPart_List(&data, &device, i);
 		cleardevicespace_FA(&data, &device);
 
 			//correctflow_SFD_NoPart_List(data.fa, data.fd, data.mapInfo.width, data.mapInfo.height, data.runoffweight, data.WhichGrid);
@@ -265,7 +273,7 @@ int main(int argc, char* argv[]) {
 
 	} // end of iterations
 
-
+	printf("%s\n", "\nEnded main iteration loop\n");
 	endrun = clock();
 	Ptime = (double) (endrun-startrun)/ CLOCKS_PER_SEC ;
 	fprintf(data.outlog, "Total simulation time of : %20.17lf \n\n", Ptime);
@@ -273,7 +281,7 @@ int main(int argc, char* argv[]) {
 	cudaFree(device.mask);
 	deleteProcessMatrices(&data);  //delete memory on host
 	clearcontribAspace(&data);
-
+	free(data.start_year);
 	fclose(data.outlog);
 
 }
