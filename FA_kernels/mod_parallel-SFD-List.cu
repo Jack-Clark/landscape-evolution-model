@@ -1,6 +1,7 @@
 #include "FA_SFD.h"
+#include <assert.h>
 
-__global__ void kernelfunction_SFD_Initital_Compute_Deps_And_Resolve_Zero_Deps(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int *dep) {
+__global__ void kernelfunction_SFD_Initital_Compute_Deps_And_Calculate_Zero_Dep_Cells(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int *dep) {
 
 	// The number of neighbour cells flowing into this cell
 	int depCount = 0;
@@ -97,7 +98,7 @@ __global__ void kernelfunction_SFD_Initital_Compute_Deps_And_Resolve_Zero_Deps(i
 }
 
 
-__global__ void kernelfunction_SFD_Resolve_Zero_Dependencies(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd) {
+__global__ void kernelfunction_SFD_Calculate_Zero_Dependency_Cells(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd) {
 
 	int irow = blockIdx.y * blockDim.y + threadIdx.y;
 	int icol = blockIdx.x * blockDim.x + threadIdx.x;
@@ -185,10 +186,11 @@ __global__ void kernelfunction_SFD_Resolve_Zero_Dependencies(int *mask, int *fd,
 }
 
 
-__global__ void kernelfunction_SFD_Resolve_Single_Dependencies(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int *dep, int *neighbourOffset) {
+__global__ void kernelfunction_SFD_Calculate_Single_Dependency_Chains(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int *dep, int *neighbourOffset) {
 
 	int irow = blockIdx.y * blockDim.y + threadIdx.y;
 	int icol = blockIdx.x * blockDim.x + threadIdx.x;
+	int maxIndex = (rows * cols) - 1;
 
 	if (irow >= rows || icol >= cols)
 		return;
@@ -199,14 +201,16 @@ __global__ void kernelfunction_SFD_Resolve_Single_Dependencies(int *mask, int *f
 
 	if(fa[self] > 0) return;
 
+	// 1D index of the cell that the current cell flows into
+	assert(fd[self] >= 0 && "\nThis kernel expects all cells to have a positive flow direction assigned. Behaviour is undefined for other values.\n");
 	int nextCellInFlow = self + neighbourOffset[__ffs(fd[self]) - 1];
 	int currentCell = self;
 
-	while(dep[nextCellInFlow] == 1 && fa[nextCellInFlow] < 0) {
+	while(nextCellInFlow < maxIndex && nextCellInFlow >= 0 && dep[nextCellInFlow] == 1 && fa[nextCellInFlow] < 0) {
 		fa[nextCellInFlow] = 1.0 * weights[nextCellInFlow];
 		fa[nextCellInFlow] += fa[currentCell];
 		currentCell = nextCellInFlow;
-		nextCellInFlow = currentCell + neighbourOffset[__ffs(fd[nextCellInFlow]) - 1];
+		nextCellInFlow = currentCell + neighbourOffset[__ffs(fd[currentCell]) - 1];
 		atomicDec(pkgprogressd, 0);
 	}
 }
@@ -222,61 +226,63 @@ int mod_process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	int grid2 = gridRows / (BLOCKROWS );
 	int fullsize = gridRows * gridColumns;
 
+	// The number of cells remaining with no FA
+	unsigned int progress_h = 0;
 	unsigned int *progress_d;
-	checkCudaErrors(cudaMalloc((void **) &progress_d, sizeof(unsigned int)) );
-	unsigned int *progress_h = (unsigned int*) malloc(sizeof(unsigned int));
-	*progress_h = 0;
+	checkCudaErrors(cudaMalloc((void **) &progress_d, sizeof(progress_h)));
+	checkCudaErrors(cudaMemcpy(progress_d, &progress_h, sizeof(progress_h), cudaMemcpyHostToDevice));
 
-	checkCudaErrors(cudaMemcpy(progress_d, progress_h, sizeof(unsigned int), cudaMemcpyHostToDevice));
-
+	/* An array that will store the number of dependencies: dependencyMap[x], for a given cell x, 
+	   as calculated in kernelfunction_SFD_Compute_Deps_And_Resolve_Zero_Deps                  */
 	int *dependencyMap;
-	int *neighbourOffset_d;
-	int neighbourOffset_h[] = {1, gridColumns+1, gridColumns, gridColumns-1, -1, -gridColumns-1, -gridColumns, -gridColumns+1};
 	checkCudaErrors(cudaMalloc((void **) &dependencyMap, fullsize * sizeof(int)));
-	checkCudaErrors(cudaMalloc((void **) &neighbourOffset_d, sizeof(neighbourOffset_h)/sizeof(int)));
 
+	/* NeighbourOffset_h stores the precomputed neighbour offsets that can be added to a cell's 
+	   index to find each one of it's neighbours. The index of the offset corresponds to the neighbour's
+	   location relative to the current cell index. To get the offset for a neighbour in a given direction,
+	   use log2(direction)-1 to compute the index for example, to get the WEST neighbour, simply calculate
+	   log2(WEST)-1 = log2(32)-1 = 4. TODO: Refactor this into a device function */
+	int neighbourOffset_h[] = {1, gridColumns+1, gridColumns, gridColumns-1, -1, -gridColumns-1, -gridColumns, -gridColumns+1};
+	int *neighbourOffset_d;
+	checkCudaErrors(cudaMalloc((void **) &neighbourOffset_d, sizeof(neighbourOffset_h)/sizeof(int)));
 	checkCudaErrors(cudaMemcpy(neighbourOffset_d, neighbourOffset_h, sizeof(neighbourOffset_h)/sizeof(int), cudaMemcpyHostToDevice));
 
 	dim3 dimGrid(grid1, grid2);
 	dim3 dimBlock(BLOCKCOLS, BLOCKROWS);
+	unsigned int iterationCount = 0;
 
-	// first run a kernel to solve those cells which are on the edges and produce the first list
+	kernelfunction_SFD_Initital_Compute_Deps_And_Calculate_Zero_Dep_Cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap);
+	assert(cudaGetLastError() == cudaSuccess):
 
-	//__global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int* left)
+	kernelfunction_SFD_Calculate_Single_Dependency_Chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
+	assert(cudaGetLastError() == cudaSuccess):
 
-	kernelfunction_SFD_Initital_Compute_Deps_And_Resolve_Zero_Deps<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap);
+	checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(progress_h), cudaMemcpyDeviceToHost));
 
-	kernelfunction_SFD_Resolve_Single_Dependencies<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
-	
-	// get the size of the array
-	checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(unsigned int), cudaMemcpyDeviceToHost));
-
+	iterationCount++;
 	unsigned int lastTot = gridRows * gridColumns;
-	unsigned int* temp = (unsigned int*) malloc(sizeof(unsigned int));
+	unsigned int temp;
 
-	while (*progress_h > 0) { // while the array still has elements
-		
-		//printf("Cells left to process = %d\n", *progress_h);
-		if (*progress_h > lastTot) {
-			printf("The number of incorrect cells should be coming down!\n");
-			scanf("%d", &lastTot);
-		}
-		lastTot = *progress_h;
+	/* All subsequent kernels are called inside the while loop*/
+	while (progress_h > 0) { // while the array still has elements
+		iterationCount++;
+		assert(progress_h > lastTot && "\nERROR: The number of incomplete cells has not fallen. This is impossible.\n");
 
-		// reset the value of progressed before restarting
-		*temp = 0;
-		checkCudaErrors(cudaMemcpy(progress_d, temp, sizeof(unsigned int), cudaMemcpyHostToDevice) );
-		//__global__ void kernelfunction_SFD_NoPart_ListProgress(int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int* left, int* had, int hadsize)
-		kernelfunction_SFD_Resolve_Zero_Dependencies<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d);
+		lastTot = progress_h;
 
-		kernelfunction_SFD_Resolve_Single_Dependencies<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
+		temp = 0;
+		checkCudaErrors(cudaMemcpy(progress_d, &temp, sizeof(temp), cudaMemcpyHostToDevice));
 
-		// get the new cell count
-		checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
+
+		kernelfunction_SFD_Calculate_Zero_Dependency_Cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d);
+		assert(cudaGetLastError() == cudaSuccess):
+
+		kernelfunction_SFD_Calculate_Single_Dependency_Chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
+		assert(cudaGetLastError() == cudaSuccess):
+
+		checkCudaErrors(cudaMemcpy(&progress_h, progress_d, sizeof(progress_h), cudaMemcpyDeviceToHost));
 	}
-
-	free(temp);
-
+	printf("\nThe total number of FA iterations was: %d\n", iterationCount);
 	// Copy flow accumulation back
 	int count = 0;
 
@@ -325,9 +331,6 @@ int mod_process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	cudaFree(dependencyMap);
 	cudaFree(neighbourOffset_d);
 
-	free(progress_h);
-
-
 	return 1;
 }
 
@@ -367,5 +370,5 @@ void mod_correctflow_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);
 
-	printf("Time to complete FA_SFD_list : %.6f s\n", time / 1000.0);
+	printf("Time to complete FA_SFD_mod_kernels : %.6f s\n", time / 1000.0);
 }
