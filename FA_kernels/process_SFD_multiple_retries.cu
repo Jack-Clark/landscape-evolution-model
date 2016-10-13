@@ -7,7 +7,7 @@
 
 #include "FA_SFD.h"
 
-#define SECOND_KERNEL_BLOCK_SIZE 128
+#define MULTI_RETRY_BLOCK_SIZE 128
 #define FA_CELL_RETRIES 25
 
 __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, unsigned int* left)
@@ -116,9 +116,9 @@ __global__ void SFD_Multiple_Retries_Progress_All_Shmem(int *mask, int *fd, doub
 	int nie, nise, nis, nisw, niw, ninw, nin, nine, self, myPos, irow, icol, readyFlag, maxSize, faHasBeenCalculated, i;
 	double accum;
 
-	__shared__ int shmem_fd[SECOND_KERNEL_BLOCK_SIZE * 8];
+	__shared__ int shmem_fd[MULTI_RETRY_BLOCK_SIZE * 8];
 
-	__shared__ double shmem_fa[SECOND_KERNEL_BLOCK_SIZE * 9];
+	__shared__ double shmem_fa[MULTI_RETRY_BLOCK_SIZE * 9];
 
 	if (pos < hadsize) {
 
@@ -252,7 +252,7 @@ __global__ void SFD_Multiple_Retries_Progress_FD_Shmem(int *mask, int *fd, doubl
 	int nie, nise, nis, nisw, niw, ninw, nin, nine, self, myPos, irow, icol, readyFlag, maxSize, faHasBeenCalculated, i;
 	double accum;
 
-	__shared__ int shmem_fd[SECOND_KERNEL_BLOCK_SIZE * 8];
+	__shared__ int shmem_fd[MULTI_RETRY_BLOCK_SIZE * 8];
 
 	if (pos < hadsize) {
 
@@ -372,11 +372,11 @@ __global__ void SFD_Multiple_Retries_Progress_FD_Shmem(int *mask, int *fd, doubl
 int process_SFD_Multiple_Retries(Data* data, Data* device, int iter) {
 	printf("In process\n");
 
-    int gridRows = data->mapInfo.height;
-	int gridColumns = data->mapInfo.width;
-	int grid1 = gridColumns / (BLOCKCOLS );
-	int grid2 = gridRows / (BLOCKROWS );
-	int fullsize = gridRows * gridColumns;
+    int rows = data->mapInfo.height;
+	int cols = data->mapInfo.width;
+	int gridCols = cols / BLOCKCOLS;
+	int gridRows = rows / BLOCKROWS;
+	int totalCells = rows * cols;
 
 	unsigned int *numCellsRemaining_d;
 	checkCudaErrors(cudaMalloc((void **) &numCellsRemaining_d, sizeof(unsigned int)) );
@@ -385,20 +385,21 @@ int process_SFD_Multiple_Retries(Data* data, Data* device, int iter) {
 
 	checkCudaErrors(cudaMemcpy(numCellsRemaining_d, numCellsRemaining_h, sizeof(unsigned int), cudaMemcpyHostToDevice));
 
+	//TODO: Rename these variables
 	unsigned int* list1;
 	unsigned int* list2;
 	unsigned int* listT;
-	checkCudaErrors(cudaMalloc((void **) &list1, fullsize * sizeof(unsigned int)) );
-	checkCudaErrors(cudaMalloc((void **) &list2, fullsize * sizeof(unsigned int)) );
+	checkCudaErrors(cudaMalloc((void **) &list1, totalCells * sizeof(unsigned int)) );
+	checkCudaErrors(cudaMalloc((void **) &list2, totalCells * sizeof(unsigned int)) );
 
-	dim3 dimGrid(grid1, grid2);
+	dim3 dimGrid(gridCols, gridRows);
 	dim3 dimBlock(BLOCKCOLS, BLOCKROWS);
 
-	SFD_Multiple_Retries_Initial<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, numCellsRemaining_d, list1);
+	SFD_Multiple_Retries_Initial<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, rows, cols, device->runoffweight, numCellsRemaining_d, list1);
 
 	checkCudaErrors(cudaMemcpy(numCellsRemaining_h, numCellsRemaining_d, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 
-	unsigned int lastTot = gridRows * gridColumns;
+	unsigned int lastTot = rows * cols;
 
 	unsigned int* temp = (unsigned int*) malloc(sizeof(unsigned int));
 
@@ -414,58 +415,53 @@ int process_SFD_Multiple_Retries(Data* data, Data* device, int iter) {
 
 		lastTot = *numCellsRemaining_h;
 
-		nextBlocks = *numCellsRemaining_h / SECOND_KERNEL_BLOCK_SIZE + 1;
+		nextBlocks = *numCellsRemaining_h / MULTI_RETRY_BLOCK_SIZE + 1;
 
 		*temp = 0;
 
 		checkCudaErrors(cudaMemcpy(numCellsRemaining_d, temp, sizeof(unsigned int), cudaMemcpyHostToDevice) );
 
-		SFD_Multiple_Retries_Progress_FD_Shmem<<<nextBlocks, SECOND_KERNEL_BLOCK_SIZE>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, numCellsRemaining_d, list1, list2, *numCellsRemaining_h);
+		SFD_Multiple_Retries_Progress_FD_Shmem<<<nextBlocks, MULTI_RETRY_BLOCK_SIZE>>>(device->mask, device->fd, device->fa, rows, cols, device->runoffweight, numCellsRemaining_d, list1, list2, *numCellsRemaining_h);
 
 		checkCudaErrors(cudaMemcpy(numCellsRemaining_h, numCellsRemaining_d, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
 	}
 
-	free(temp);
-
-	int count = 0;
-
-	checkCudaErrors(cudaMemcpy(data->fa, device->fa, fullsize * sizeof(double),   cudaMemcpyDeviceToHost));
+	checkCudaErrors(cudaMemcpy(data->fa, device->fa, totalCells * sizeof(double),   cudaMemcpyDeviceToHost));
 	fprintf(data->outlog, "FA: FA memcopy back operation 3:%s\n", cudaGetErrorString(cudaGetLastError()));
 
 	double FA_max;
 	int FAindex = 0;
 	double cpuFA_max = 0.0;
 
-	if (iter == 1) // cpu calculation otherwise we cannot locate the outletcell index
-	{
-		for (int i = 0; i < gridRows; i++) {
-			for (int j = 0; j < gridColumns; j++) {
-				if (data->fa[i * gridColumns + j] > cpuFA_max)
-					{
-					cpuFA_max = data->fa[i * gridColumns + j];
-					FAindex = i * gridColumns + j;
-					}
+	if (iter == 1) {
+		for (int i = 0; i < rows; i++) {
+			for (int j = 0; j < cols; j++) {
+				if (data->fa[i * cols + j] > cpuFA_max) {
+					cpuFA_max = data->fa[i * cols + j];
+					FAindex = i * cols + j;
+				}
 			}
 		}
 		data->FA_max = cpuFA_max;
 		data->outletcellidx = FAindex; // this is the outlet cell which will be maintained throughout the simulation
-	} else // do it faster using GPU in all subsequent iterations
-		{
+	} else {
 			thrust::device_ptr<double> max_FA = thrust::device_pointer_cast(device->fa);
-			FA_max = thrust::reduce(max_FA, max_FA + fullsize, (double) 0, thrust::maximum<double>());
+			FA_max = thrust::reduce(max_FA, max_FA + totalCells, (double) 0, thrust::maximum<double>());
 			data->FA_max = FA_max;
-		}
+	}
 
 	fprintf(data->outlog, "FA: Maximum FA is  %.6f s\n\n", data->FA_max);
 	fprintf(data->outlog, "FA: Outletcell index is  %d s\n\n", data->outletcellidx);
 
 	printf("Maximum FA is  %.6f s\n\n", data->FA_max);
 
-	for (int i = 0; i < gridRows; i++) {
-		for (int j = 0; j < gridColumns; j++) {
-				if (data->fa[i * gridColumns + j] < 0) {
+	int count = 0;
+
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (data->fa[i * cols + j] < 0) {
 					count++;
-				}
+			}
 		}
 	}
 	fprintf(data->outlog, "FA: Bad value count (i.e. not in catchment(s) = %d\n", count);
@@ -473,7 +469,7 @@ int process_SFD_Multiple_Retries(Data* data, Data* device, int iter) {
 	cudaFree(list1);
 	cudaFree(list2);
 	cudaFree(numCellsRemaining_d);
-
+	free(temp);
 	free(numCellsRemaining_h);
 
 	return 1;

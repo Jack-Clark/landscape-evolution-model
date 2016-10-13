@@ -233,107 +233,105 @@ __global__ void calculate_single_dependency_chains(int *mask, int *fd, double *f
 int process_SFD_global_level_single_chain(Data* data, Data* device, int iter) {
 	printf("In process\n");
 
-    int gridRows = data->mapInfo.height;
-	int gridColumns = data->mapInfo.width;
-	int grid1 = gridColumns / (BLOCKCOLS );
-	int grid2 = gridRows / (BLOCKROWS );
-	int fullsize = gridRows * gridColumns;
+    int rows = data->mapInfo.height;
+	int cols = data->mapInfo.width;
+	int gridCols = cols / BLOCKCOLS;
+	int gridRows = rows / BLOCKROWS;
+	int totalCells = rows * cols;
 
 	// The number of cells remaining with no FA
-	unsigned int progress_h = 0;
-	unsigned int *progress_d;
-	checkCudaErrors(cudaMalloc((void **) &progress_d, sizeof(progress_h)));
-	checkCudaErrors(cudaMemcpy(progress_d, &progress_h, sizeof(progress_h), cudaMemcpyHostToDevice));
+	unsigned int numCellsRemaining_h = 0;
+	unsigned int *numCellsRemaining_d;
+	checkCudaErrors(cudaMalloc((void **) &numCellsRemaining_d, sizeof(numCellsRemaining_h)));
+	checkCudaErrors(cudaMemcpy(numCellsRemaining_d, &numCellsRemaining_h, sizeof(numCellsRemaining_h), cudaMemcpyHostToDevice));
 
 	/* An array that will store the number of dependencies: dependencyMap[x], for a given cell x, 
 	   as calculated in kernelfunction_SFD_Compute_Deps_And_Resolve_Zero_Deps                  */
 	int *dependencyMap;
-	checkCudaErrors(cudaMalloc((void **) &dependencyMap, fullsize * sizeof(int)));
+	checkCudaErrors(cudaMalloc((void **) &dependencyMap, totalCells * sizeof(int)));
 
 	/* NeighbourOffset_h stores the precomputed neighbour offsets that can be added to a cell's 
 	   index to find each one of it's neighbours. The index of the offset corresponds to the neighbour's
 	   location relative to the current cell index. To get the offset for a neighbour in a given direction,
 	   use log2(direction)-1 to compute the index for example, to get the WEST neighbour, simply calculate
 	   log2(WEST)-1 = log2(32)-1 = 4. TODO: Refactor this into a device function */
-	int neighbourOffset_h[] = {1, gridColumns+1, gridColumns, gridColumns-1, -1, -gridColumns-1, -gridColumns, -gridColumns+1};
+	int neighbourOffset_h[] = {1, cols+1, cols, cols-1, -1, -cols-1, -cols, -cols+1};
 	int *neighbourOffset_d;
 	checkCudaErrors(cudaMalloc((void **) &neighbourOffset_d, sizeof(neighbourOffset_h)/sizeof(int)));
 	checkCudaErrors(cudaMemcpy(neighbourOffset_d, neighbourOffset_h, sizeof(neighbourOffset_h)/sizeof(int), cudaMemcpyHostToDevice));
 
-	dim3 dimGrid(grid1, grid2);
+	dim3 dimGrid(gridCols, gridRows);
 	dim3 dimBlock(BLOCKCOLS, BLOCKROWS);
 
-	find_deps_and_calculate_zero_dep_cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap);
+	find_deps_and_calculate_zero_dep_cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, rows, cols, device->runoffweight, numCellsRemaining_d, dependencyMap);
 
-	calculate_single_dependency_chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
+	calculate_single_dependency_chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, rows, cols, device->runoffweight, numCellsRemaining_d, dependencyMap, neighbourOffset_d);
 
-	checkCudaErrors(cudaMemcpy(&progress_h, progress_d, sizeof(progress_h), cudaMemcpyDeviceToHost));
+	checkCudaErrors(cudaMemcpy(&numCellsRemaining_h, numCellsRemaining_d, sizeof(numCellsRemaining_h), cudaMemcpyDeviceToHost));
 
 	unsigned int temp;
 
-	unsigned int lastTot = gridRows * gridColumns;
+	unsigned int lastTot = rows * cols;
 
-	while (progress_h > 0) {
+	while (numCellsRemaining_h > 0) {
 
-		assert(progress_h < lastTot);
+		assert(numCellsRemaining_h < lastTot);
 
-		lastTot = progress_h;
+		lastTot = numCellsRemaining_h;
 
 		temp = 0;
 
-		checkCudaErrors(cudaMemcpy(progress_d, &temp, sizeof(temp), cudaMemcpyHostToDevice));
+		checkCudaErrors(cudaMemcpy(numCellsRemaining_d, &temp, sizeof(temp), cudaMemcpyHostToDevice));
 
-		calculate_zero_dependency_cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d);
+		calculate_zero_dependency_cells<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, rows, cols, device->runoffweight, numCellsRemaining_d);
 
-		calculate_single_dependency_chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, dependencyMap, neighbourOffset_d);
+		calculate_single_dependency_chains<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, rows, cols, device->runoffweight, numCellsRemaining_d, dependencyMap, neighbourOffset_d);
 
-		checkCudaErrors(cudaMemcpy(&progress_h, progress_d, sizeof(progress_h), cudaMemcpyDeviceToHost));
+		checkCudaErrors(cudaMemcpy(&numCellsRemaining_h, numCellsRemaining_d, sizeof(numCellsRemaining_h), cudaMemcpyDeviceToHost));
 	}
 
-	int count = 0;
 
-	checkCudaErrors(cudaMemcpy(data->fa, device->fa, fullsize * sizeof(double),   cudaMemcpyDeviceToHost));
+	checkCudaErrors(cudaMemcpy(data->fa, device->fa, totalCells * sizeof(double),   cudaMemcpyDeviceToHost));
 	fprintf(data->outlog, "FA: FA memcopy back operation 3:%s\n", cudaGetErrorString(cudaGetLastError()));
 
 	double FA_max;
 	int FAindex = 0;
 	double cpuFA_max = 0.0;
 
-	if (iter == 1) // cpu calculation otherwise we cannot locate the outletcell index
-	{
-		for (int i = 0; i < gridRows; i++) {
-			for (int j = 0; j < gridColumns; j++) {
-				if (data->fa[i * gridColumns + j] > cpuFA_max)
-					{
-					cpuFA_max = data->fa[i * gridColumns + j];
-					FAindex = i * gridColumns + j;
-					}
+	if (iter == 1) {
+		for (int i = 0; i < rows; i++) {
+			for (int j = 0; j < cols; j++) {
+				if (data->fa[i * cols + j] > cpuFA_max) {
+					cpuFA_max = data->fa[i * cols + j];
+					FAindex = i * cols + j;
+				}
 			}
 		}
 		data->FA_max = cpuFA_max;
 		data->outletcellidx = FAindex; // this is the outlet cell which will be maintained throughout the simulation
-	} else // do it faster using GPU in all subsequent iterations
-		{
+	} else {
 			thrust::device_ptr<double> max_FA = thrust::device_pointer_cast(device->fa);
-			FA_max = thrust::reduce(max_FA, max_FA + fullsize, (double) 0, thrust::maximum<double>());
+			FA_max = thrust::reduce(max_FA, max_FA + totalCells, (double) 0, thrust::maximum<double>());
 			data->FA_max = FA_max;
-		}
+	}
 
 	fprintf(data->outlog, "FA: Maximum FA is  %.6f s\n\n", data->FA_max);
 	fprintf(data->outlog, "FA: Outletcell index is  %d s\n\n", data->outletcellidx);
 
 	printf("Maximum FA is  %.6f s\n\n", data->FA_max);
 
-	for (int i = 0; i < gridRows; i++) {
-		for (int j = 0; j < gridColumns; j++) {
-			if (data->fa[i * gridColumns + j] < 0) {
+	int count = 0;
+
+	for (int i = 0; i < rows; i++) {
+		for (int j = 0; j < cols; j++) {
+			if (data->fa[i * cols + j] < 0) {
 				count++;
 			}
 		}
 	}
 	fprintf(data->outlog, "FA: Bad value count (i.e. not in catchment(s) = %d\n", count);
 
-	cudaFree(progress_d);
+	cudaFree(numCellsRemaining_d);
 	cudaFree(dependencyMap);
 	cudaFree(neighbourOffset_d);
 

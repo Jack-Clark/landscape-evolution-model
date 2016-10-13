@@ -11,16 +11,16 @@ void correctflow_SFD(Data* data, Data* device, int iter) {
 
 	cudaEvent_t start, stop;
 	float time;
-    int gridRows = data->mapInfo.height;
-	int gridColumns = data->mapInfo.width;
-	int fullsize = gridRows * gridColumns;
+    int rows = data->mapInfo.height;
+	int cols = data->mapInfo.width;
+	int totalCells = rows * cols;
 
-	for (x = 0; x < gridRows * gridColumns; ++x) {
+	for (x = 0; x < rows * cols; ++x) {
 		data->fa[x] = -1.0;
 	}
 
 	fprintf(data->outlog, "FA: set fagrid values to -1\n");
-	cudaMemcpy(device->fa, data->fa, fullsize * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(device->fa, data->fa, totalCells * sizeof(double), cudaMemcpyHostToDevice);
 	fprintf(data->outlog, "FA: FA memcopy operation :%s\n", cudaGetErrorString(cudaGetLastError()));
 
 	fprintf(data->outlog, "FA: Calling process\n");
