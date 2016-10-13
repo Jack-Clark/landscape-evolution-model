@@ -17,12 +17,12 @@ void correctflow_SFD(Data* data, Data* device, int iter);
 
 int process_SFD_Multiple_Retries(Data* data, Data* device, int iter);
 
-void accumulateflowSFD(Data* data, Data* device, int iter);
-
 int process_SFD_NoPart_List(Data* data, Data* device, int iter);
 
 int process_SFD_block_level_single_chain(Data* data, Data* device, int iter);
 
 int process_SFD_global_level_single_chain(Data* data, Data* device, int iter);
+
+void accumulateflowSFD(Data* data, Data* device, int iter);
 
 #endif /* FA_SFD_H_ */
