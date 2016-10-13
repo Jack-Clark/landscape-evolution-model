@@ -50,7 +50,7 @@ __global__ void calcrunoffweight(int ncell_x, int ncell_y, double ppn, int* mask
 				{
 					soilMPtr[self] = 0.5;
 				}
-	if (runoffweight[self] == 0) printf("weight = 0 IN CATCHMENT");
+	//if (runoffweight[self] == 0) printf("weight = 0 IN CATCHMENT");
 
 }
 

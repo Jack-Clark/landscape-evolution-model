@@ -13,22 +13,16 @@
 #include "Directions.h"
 #include "config.h"
 
-//#include "pad.h"
-//#include "partition.h"
-//#include "MGPU_correct.h"
-//#include "mfd_correct.h"
-//#include "parallel_sfd_noPart.h"
-//#include "parallel_sfd_noPart_noOK.h"
-//#include "parallel_sfd_noPart_List.h"
+void correctflow_SFD(Data* data, Data* device, int iter);
 
+int process_SFD_Multiple_Retries(Data* data, Data* device, int iter);
 
 void accumulateflowSFD(Data* data, Data* device, int iter);
 
 int process_SFD_NoPart_List(Data* data, Data* device, int iter);
 
-void correctflow_SFD_NoPart_List(Data* data, Data* device, int iter);
+int process_SFD_block_level_single_chain(Data* data, Data* device, int iter);
 
-void mod_correctflow_SFD_NoPart_List(Data* data, Data* device, int iter);
-
+int process_SFD_global_level_single_chain(Data* data, Data* device, int iter);
 
 #endif /* FA_SFD_H_ */

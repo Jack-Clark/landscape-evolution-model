@@ -128,14 +128,13 @@ int main(int argc, char* argv[]) {
     int runiniter; // how many on default rain and temp set above
     int totalnumiter;
 
-    runiniter = 10;
+    runiniter = 5;
     start_pos_sim = 0; //  140k dataset
-    printf("Getting to before weird pointer\n");
 
     data.start_year = (int *) malloc(sizeof(int));
     *data.start_year = start_pos_sim;
-    printf("Getting to after weird pointer\n");
-    end_pos_sim = 10;
+
+    end_pos_sim = 5;
 
     totalnumiter = runiniter + (end_pos_sim-start_pos_sim);
 
@@ -176,7 +175,7 @@ int main(int argc, char* argv[]) {
 		// ****************************************  SFD   ****************************************************
 		printf("Entering FA: \n");
 		//accumulateflowSFD(&data, &device, i);
-		mod_correctflow_SFD_NoPart_List(&data, &device, i);
+		correctflow_SFD(&data, &device, i);
 		cleardevicespace_FA(&data, &device);
 
 			//correctflow_SFD_NoPart_List(data.fa, data.fd, data.mapInfo.width, data.mapInfo.height, data.runoffweight, data.WhichGrid);
