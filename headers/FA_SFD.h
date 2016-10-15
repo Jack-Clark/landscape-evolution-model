@@ -8,6 +8,8 @@
 #ifndef FA_SFD_H_
 #define FA_SFD_H_
 
+/* TODO: Refactor header inclusion. These should be included in the source files as needed, not bundled into one header. 
+   Only Data.h is required in this header. */
 #include "lem.h"
 #include "Data.h"
 #include "Directions.h"

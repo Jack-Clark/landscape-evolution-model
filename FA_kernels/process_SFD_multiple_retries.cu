@@ -385,7 +385,6 @@ int process_SFD_Multiple_Retries(Data* data, Data* device, int iter) {
 
 	checkCudaErrors(cudaMemcpy(numCellsRemaining_d, numCellsRemaining_h, sizeof(unsigned int), cudaMemcpyHostToDevice));
 
-	//TODO: Rename these variables
 	unsigned int* list1;
 	unsigned int* list2;
 	unsigned int* listT;
@@ -443,7 +442,7 @@ int process_SFD_Multiple_Retries(Data* data, Data* device, int iter) {
 			}
 		}
 		data->FA_max = cpuFA_max;
-		data->outletcellidx = FAindex; // this is the outlet cell which will be maintained throughout the simulation
+		data->outletcellidx = FAindex; // This is the outlet cell which will be maintained throughout the simulation
 	} else {
 			thrust::device_ptr<double> max_FA = thrust::device_pointer_cast(device->fa);
 			FA_max = thrust::reduce(max_FA, max_FA + totalCells, (double) 0, thrust::maximum<double>());
