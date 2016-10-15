@@ -336,7 +336,7 @@ int writeSummaryDataToFile(Data* data, int howmany, int iteration)
 	
 	// outfiles given csv extension for wasy read into excel etc for plotting
 	char* outfilename = (char*) malloc(sizeof(char) *100); 
-	sprintf(outfilename, "../summarydata/modelsum%d/model%d.csv", data->usethisgpu, data->usethisgpu);
+	sprintf(outfilename, "summarydata/modelsum%d/model%d.csv", data->usethisgpu, data->usethisgpu);
 	const char* outfile1 = outfilename;	
 
 	FILE* out1; 

@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 	data.temp_inflex = 6. ;
 	data.temp_sens = 6.;
 
-	sprintf(logfile, "output%d/logfile_%dm_%d.txt", data.usethisgpu, data.WhichGrid, data.max_iterations);
+	sprintf(logfile, "Output%d/logfile_%dm_%d.txt", data.usethisgpu, data.WhichGrid, data.max_iterations);
 
 	data.logfileOut = logfile;
 	data.outlog = fopen(data.logfileOut, "w");
@@ -82,12 +82,12 @@ int main(int argc, char* argv[]) {
 	{
 
 		case 8:
-			file = "../inputgrids/thames20m.asc"; // this is the modified 20m DEM i.e. given an outlet cell
-			maskfile = "../inputgrids/20mMask.tif"; // this is the mask file
+			file = "inputgrids/thames20m.asc"; // this is the modified 20m DEM i.e. given an outlet cell
+			maskfile = "inputgrids/20mMask.tif"; // this is the mask file
 			//totgridsize = 8666880  2928 cols, 2960 rows
 			break;
 	}
-	clim_file = "../inputdata/SSTbase.txt";
+	clim_file = "inputdata/SSTbase.txt";
 		
 
 	fprintf(data.outlog,"Landscape file   = %s\n", file);
@@ -198,61 +198,61 @@ int main(int argc, char* argv[]) {
 		if ( i==10 || i%1000==0 )
 		{
 			// Write the recalculated DEM
-			sprintf(heightfile, "output%d/%d_height.tif",data.usethisgpu,  i);
+			sprintf(heightfile, "Output%d/%d_height.tif",data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, heightfile, 0, 0);
 			
 			// Write the recalculated SFD
-			if (data.flowdirectiontype == 0) sprintf(SFDfile, "output%d/%d_SFD.tif",data.usethisgpu,  i);
-			if (data.flowdirectiontype == 1) sprintf(SFDfile, "output%d/MFD_%dm_%d.tif", data.usethisgpu, data.WhichGrid, i);
+			if (data.flowdirectiontype == 0) sprintf(SFDfile, "Output%d/%d_SFD.tif",data.usethisgpu,  i);
+			if (data.flowdirectiontype == 1) sprintf(SFDfile, "Output%d/MFD_%dm_%d.tif", data.usethisgpu, data.WhichGrid, i);
 			writegdalGRIDtoFile(&data, &catchments, SFDfile, 1, 0);
 
 			//sprintf(contrib, "output1/contrib_%dm_%d.tif", data.WhichGrid, i);
 			//writegdalGRIDtoFile(&data, &catchments, contrib, 1, 3);
 
 			// Write the recalculated FA
-			sprintf(FAfile, "output%d/%d_FA.tif", data.usethisgpu,  i);
+			sprintf(FAfile, "Output%d/%d_FA.tif", data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, FAfile, 0, 1);
 					
 			// Write the recalculated erosion
-			sprintf(erofile, "output%d/%d_ero.tif", data.usethisgpu,  i);
+			sprintf(erofile, "Output%d/%d_ero.tif", data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, erofile, 0, 2);
 					
 			// Write the recalculated incision
-			sprintf(incifile, "output%d/%d_inci.tif", data.usethisgpu, i);
+			sprintf(incifile, "Output%d/%d_inci.tif", data.usethisgpu, i);
 			writegdalGRIDtoFile(&data, &catchments, incifile, 0, 3);
 					
 			// Write the recalculated deposition
-			sprintf(depofile, "output%d/%d_depo.tif", data.usethisgpu, i);
+			sprintf(depofile, "Output%d/%d_depo.tif", data.usethisgpu, i);
 			writegdalGRIDtoFile(&data, &catchments, depofile, 0, 4);
 					
 			// Write the recalculated slope
-			sprintf(slopefile, "output%d/%d_slope.tif", data.usethisgpu,  i);
+			sprintf(slopefile, "Output%d/%d_slope.tif", data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, slopefile, 0, 5);
 
 			// Write the recalculated fines
-			sprintf(finesfile, "output%d/%d_fines.tif", data.usethisgpu,  i);
+			sprintf(finesfile, "Output%d/%d_fines.tif", data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, finesfile, 0, 6);
 
 			// Write the recalculated stone
-			sprintf(stonesfile, "output%d/%d_stone.tif", data.usethisgpu, i);
+			sprintf(stonesfile, "Output%d/%d_stone.tif", data.usethisgpu, i);
 			writegdalGRIDtoFile(&data, &catchments, stonesfile, 0, 7);
 
-			sprintf(totbiofile, "output%d/%d_totbio.tif", data.usethisgpu,  i);
+			sprintf(totbiofile, "Output%d/%d_totbio.tif", data.usethisgpu,  i);
 			//writegdalGRIDtoFile(&data, &catchments, totbiofile, 0, 8);
 
-			sprintf(soilTfile, "output%d/%d_soilT.tif", data.usethisgpu,  i);
+			sprintf(soilTfile, "Output%d/%d_soilT.tif", data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, soilTfile, 0, 9);
 
-			sprintf(nutfile, "output%d/%d_nut.tif", data.usethisgpu,  i);
+			sprintf(nutfile, "Output%d/%d_nut.tif", data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, nutfile, 0, 10);
 
-			sprintf(wCfile, "output%d/%d_wC.tif", data.usethisgpu,  i);
+			sprintf(wCfile, "Output%d/%d_wC.tif", data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, wCfile, 0, 11);
 
-			sprintf(wPfile, "output%d/%d_wP.tif",data.usethisgpu,  i);
+			sprintf(wPfile, "Output%d/%d_wP.tif",data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, wPfile, 0, 12);
 
-			sprintf(gelifile, "output%d/%d_geli.tif",data.usethisgpu,  i);
+			sprintf(gelifile, "Output%d/%d_geli.tif",data.usethisgpu,  i);
 			writegdalGRIDtoFile(&data, &catchments, gelifile, 0, 13);
 		}	
 
