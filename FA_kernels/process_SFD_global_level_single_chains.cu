@@ -25,7 +25,7 @@ __global__ void find_deps_and_calculate_zero_dep_cells(int *mask, int *fd, doubl
 
  	int numNeighboursReady = 0;
 
-	if (mask[self] == 0) { // don't calculate if not in catchment(s) of interest
+	if (mask[self] == 0) {
 		return;
 	}
 
@@ -120,7 +120,7 @@ __global__ void calculate_zero_dependency_cells(int *mask, int *fd, double *fa, 
 		return;
 
 	int self = irow * cols + icol;
-	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+	if (mask[self] == 0) return;
 
 	if(fa[self] >= 0) return;
 
@@ -210,7 +210,7 @@ __global__ void calculate_single_dependency_chains(int *mask, int *fd, double *f
 
 	int self = irow * cols + icol;
 
-	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+	if (mask[self] == 0) return;
 
 	if(fa[self] < 0) return;
 
@@ -254,7 +254,7 @@ int process_SFD_global_level_single_chain(Data* data, Data* device, int iter) {
 	   index to find each one of it's neighbours. The index of the offset corresponds to the neighbour's
 	   location relative to the current cell index. To get the offset for a neighbour in a given direction,
 	   use log2(direction)-1 to compute the index for example, to get the WEST neighbour, simply calculate
-	   log2(WEST)-1 = log2(32)-1 = 4. TODO: Refactor this into a device function */
+	   log2(WEST)-1 = log2(32)-1 = 4. */
 	int neighbourOffset_h[] = {1, cols+1, cols, cols-1, -1, -cols-1, -cols, -cols+1};
 	int *neighbourOffset_d;
 	checkCudaErrors(cudaMalloc((void **) &neighbourOffset_d, sizeof(neighbourOffset_h)/sizeof(int)));

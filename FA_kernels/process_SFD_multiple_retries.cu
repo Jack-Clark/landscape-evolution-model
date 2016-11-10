@@ -20,7 +20,7 @@ __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int
 		return;
 
 	int self = irow * cols + icol;
-	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+	if (mask[self] == 0) return;
 	int nie, nise, nis, nisw, niw, ninw, nin, nine;
 
 	double accum = 1.0 * weights[self];
@@ -50,7 +50,6 @@ __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int
 		    left[myPos] = self;
 			return;
 		}
-
 		accum += fa[nise];
 	}
 	if (irow < rows - 1 && fd[nis] & NORTH) {
@@ -67,7 +66,6 @@ __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int
 		    left[myPos] = self;
 			return;
 		}
-
 		accum += fa[nisw];
 	}
 	if (icol > 0 && fd[niw] & EAST) {
@@ -76,7 +74,6 @@ __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int
 		    left[myPos] = self;
 			return;
 		}
-
 		accum += fa[niw];
 	}
 	if (icol > 0 && irow > 0 && fd[ninw] & SOUTHEAST) {
@@ -85,7 +82,6 @@ __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int
 		    left[myPos] = self;
 			return;
 		}
-
 		accum += fa[ninw];
 	}
 	if (irow > 0 && fd[nin] & SOUTH) {
@@ -94,7 +90,6 @@ __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int
 		    left[myPos] = self;
 			return;
 		}
-
 		accum += fa[nin];
 	}
 	if (irow > 0 && icol < cols - 1 && fd[nine] & SOUTHWEST) {
@@ -103,7 +98,6 @@ __global__ void SFD_Multiple_Retries_Initial(int *mask, int *fd, double *fa, int
 		    left[myPos] = self;
 			return;
 		}
-
 		accum += fa[nine];
 	}
 	fa[self] = accum;

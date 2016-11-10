@@ -290,8 +290,8 @@ int process_SFD_block_level_single_chain(Data* data, Data* device, int iter) {
 	/* NeighbourOffset_h stores the precomputed neighbour offsets that can be added to a cell's 
 	   index to find each one of it's neighbours. The index of the offset corresponds to the neighbour's
 	   location relative to the current cell index. To get the offset for a neighbour in a given direction,
-	   use log2(direction)-1 to compute the index for example, to get the WEST neighbour, simply calculate
-	   log2(WEST)-1 = log2(32)-1 = 4. TODO: Refactor this into a device function */
+	   use log2(direction)-1 to compute the index, for example, to get the WEST neighbour, simply calculate
+	   log2(WEST)-1 = log2(32)-1 = 4. */
 	int neighbourOffset_h[] = {-(cols * rows) - 1, 1, cols+1, cols, cols-1, -1, -cols-1, -cols, -cols+1};
 	int *neighbourOffset_d;
 	checkCudaErrors(cudaMalloc((void **) &neighbourOffset_d, sizeof(neighbourOffset_h)/sizeof(int)));
