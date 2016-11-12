@@ -1,10 +1,10 @@
 
 #include "FA_SFD.h"
 
-void correctflow_SFD(Data* data, Data* device, int iter) {
+int correctflow_SFD(Data* data, Data* device, int iter, int algorithmID) {
 	if (cudaSuccess != cudaSetDevice(CUDA_DEVICE)) {
 		printf("Unable to access CUDA card\n");
-		return ;
+		return 1;
 	}
 
 	int x;
@@ -29,8 +29,29 @@ void correctflow_SFD(Data* data, Data* device, int iter) {
 	cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 
-	// Change this function to whichever version of the algorithm you want to run.
-	process_SFD_Multiple_Retries(data, device, iter);
+	switch(algorithmID) {
+
+		case 1:
+			process_SFD_NoPart_List(data, device, iter);
+			break;
+	
+		case 2:
+			process_SFD_block_level_single_chains(data, device, iter);
+			break;
+
+		case 3:
+			process_SFD_global_level_single_chains(data, device, iter);
+			break;
+
+		case 4:
+			process_SFD_Multiple_Retries(data, device, iter);
+			break;
+
+		default:
+			fprintf(data->outlog, "\nInvalid algorithmID. Exiting...\n");
+			printf("\nInvalid algorithmID. Exiting...\n");
+			return 1;
+	}
 
 	cudaEventRecord(stop,0);
 	cudaEventSynchronize(stop);
@@ -39,4 +60,6 @@ void correctflow_SFD(Data* data, Data* device, int iter) {
 	cudaEventDestroy(stop);
 
 	printf("Time to complete FA_SFD_list : %.6f s\n", time / 1000.0);
+
+	return 0;
 }

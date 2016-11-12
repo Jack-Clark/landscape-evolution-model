@@ -260,7 +260,7 @@ __global__ void calculate_block_single_chains(int *mask, int *fd, double *fa, in
 
 
 
-int process_SFD_block_level_single_chain(Data* data, Data* device, int iter) {
+int process_SFD_block_level_single_chains(Data* data, Data* device, int iter) {
 	printf("In process\n");
 
     int rows = data->mapInfo.height;
@@ -386,5 +386,5 @@ int process_SFD_block_level_single_chain(Data* data, Data* device, int iter) {
 	free(temp);
 	free(numCellsRemaining_h);
 
-	return 1;
+	return 0;
 }

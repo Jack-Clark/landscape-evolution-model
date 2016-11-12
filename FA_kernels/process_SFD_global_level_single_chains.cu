@@ -230,7 +230,7 @@ __global__ void calculate_single_dependency_chains(int *mask, int *fd, double *f
 }
 
 
-int process_SFD_global_level_single_chain(Data* data, Data* device, int iter) {
+int process_SFD_global_level_single_chains(Data* data, Data* device, int iter) {
 	printf("In process\n");
 
     int rows = data->mapInfo.height;
@@ -335,5 +335,5 @@ int process_SFD_global_level_single_chain(Data* data, Data* device, int iter) {
 	cudaFree(dependencyMap);
 	cudaFree(neighbourOffset_d);
 
-	return 1;
+	return 0;
 }

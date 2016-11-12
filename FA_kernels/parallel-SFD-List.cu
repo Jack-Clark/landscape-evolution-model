@@ -1,9 +1,13 @@
+/**
+	This is the optimised versino of the NoPart List flow accumulation algorithm. It sets a baseline for performance.
+**/
+
+
 #include "FA_SFD.h"
 
 
 __global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, unsigned int* left)
 {
-	//int self = blockIdx.y*cols*BLOCKROWS + blockIdx.x*BLOCKCOLS + threadIdx.y*cols + threadIdx.x;
 	int irow = blockIdx.y * blockDim.y + threadIdx.y;
 	int icol = blockIdx.x * blockDim.x + threadIdx.x;
 	int maxSize = rows * cols;
@@ -12,7 +16,7 @@ __global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, i
 		return;
 
 	int self = irow * cols + icol;
-	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
+	if (mask[self] == 0) return;
 	int nie, nise, nis, nisw, niw, ninw, nin, nine;
 
 	double accum = 1.0 * weights[self];
@@ -112,7 +116,6 @@ __global__ void kernelfunction_SFD_NoPart_ListProgress(int *mask, int *fd, doubl
 		return;
 
 	int self = had[pos];
-//	if (mask[self] == 0) return; // don't calculate if not in catchment(s) of interest
 
 	double accum = 1.0 * weights[self];
 
@@ -221,80 +224,46 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 
 	checkCudaErrors(cudaMemcpy(progress_d, progress_h, sizeof(unsigned int), cudaMemcpyHostToDevice));
 
-	// Pull straight back
-//	checkCudaErrors(cudaMemcpy(progress_h, progress_d. sizeof(unsigned int), cudaMemcpyDeviceToHost));
-
-
 	unsigned int* list1;
 	unsigned int* list2;
 	unsigned int* listT;
 	checkCudaErrors(cudaMalloc((void **) &list1, fullsize * sizeof(unsigned int)) ); //FIXME - need to figure out a way to set this value
 	checkCudaErrors(cudaMalloc((void **) &list2, fullsize * sizeof(unsigned int)) ); //FIXME - need to figure out a way to set this value
-	//checkCudaErrors(cudaMalloc((void **) &listT, sizeof(unsigned int)) );
-
-	//printf("ListT = %x\n", listT);
 
 	dim3 dimGrid(grid1, grid2);
 	dim3 dimBlock(BLOCKCOLS, BLOCKROWS);
 
-	//printf(":%s\n", cudaGetErrorString(cudaGetLastError()));
-
-
-	// first run a kernel to solve those cells which are on the edges and produce the first list
-
-	//__global__ void kernelfunction_SFD_NoPart_List(int *mask, int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int* left)
-
 	kernelfunction_SFD_NoPart_List<<<dimGrid, dimBlock>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, list1);
 
-	//printf(":First kernel function %s\n", cudaGetErrorString(cudaGetLastError()));
-
-
-	// get the size of the array
 	checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(unsigned int), cudaMemcpyDeviceToHost));
 
 	unsigned int lastTot = gridRows * gridColumns;
-
-	//printf("starting loop left=%d\n", *progress_h);
-	//printf("max left = %d\n", lastTot);
 
 	unsigned int* temp = (unsigned int*) malloc(sizeof(unsigned int));
 
 	int nextBlocks;
 
-	while (*progress_h > 0) { // while the array still has elements
+	while (*progress_h > 0) {
 
-		// Swap list 1 and list 2
 		listT = list1;
 		list1 = list2;
 		list2 = listT;
-		//printf("Cells left to process = %d\n", *progress_h);
+
 		if (*progress_h > lastTot) {
 			printf("The number of incorrect cells should be coming down!\n");
 			scanf("%d", &lastTot);
 		}
 		lastTot = *progress_h;
-		// call kernel to process the list
+
 		nextBlocks = *progress_h / 128 + 1;
 
-		// reset the value of progressed before restarting
-
 		*temp = 0;
+
 		checkCudaErrors(cudaMemcpy(progress_d, temp, sizeof(unsigned int), cudaMemcpyHostToDevice) );
-		//__global__ void kernelfunction_SFD_NoPart_ListProgress(int *fd, double *fa, int rows, int cols, double *weights, unsigned int* pkgprogressd, int* left, int* had, int hadsize)
 		kernelfunction_SFD_NoPart_ListProgress<<<nextBlocks, 128>>>(device->mask, device->fd, device->fa, gridRows, gridColumns, device->runoffweight, progress_d, list1, list2, *progress_h);
-
-		//cudaDeviceSynchronize();
-		//printf(":loop kernel function %s\n", cudaGetErrorString(cudaGetLastError()));
-
-		// get the new cell count
 		checkCudaErrors(cudaMemcpy(progress_h, progress_d, sizeof(unsigned int), cudaMemcpyDeviceToHost) );
-		//printf("Left= %d\n", *progress_h);
 	}
 
-
-	free(temp);
-
-	// Copy flow accumulation back
 	int count = 0;
 
 	checkCudaErrors(cudaMemcpy(data->fa, device->fa, fullsize * sizeof(double),   cudaMemcpyDeviceToHost));
@@ -304,7 +273,7 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 	int FAindex = 0;
 	double cpuFA_max = 0.0;
 
-	if (iter == 1) // cpu calculation otherwise we cannot locate the outletcell index
+	if (iter == 1)
 	{
 		for (int i = 0; i < gridRows; i++) {
 			for (int j = 0; j < gridColumns; j++) {
@@ -317,7 +286,7 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 		}
 		data->FA_max = cpuFA_max;
 		data->outletcellidx = FAindex; // this is the outlet cell which will be maintained throughout the simulation
-	} else // do it faster using GPU in all subsequent iterations
+	} else
 		{
 			thrust::device_ptr<double> max_FA = thrust::device_pointer_cast(device->fa);
 			FA_max = thrust::reduce(max_FA, max_FA + fullsize, (double) 0, thrust::maximum<double>());
@@ -331,22 +300,20 @@ int process_SFD_NoPart_List(Data* data, Data* device, int iter) {
 
 	for (int i = 0; i < gridRows; i++) {
 		for (int j = 0; j < gridColumns; j++) {
-				if (data->fa[i * gridColumns + j] < 0) {
-				//if (count < 20)
-					//printf("[%d,%d] = %8.7f\n", i, j, data->fa[i * ncell_x + j]);
+			if (data->fa[i * gridColumns + j] < 0) {
 				count++;
-				}
+			}
 		}
 	}
+
 	fprintf(data->outlog, "FA: Bad value count (i.e. not in catchment(s) = %d\n", count);
 
 	cudaFree(list1);
 	cudaFree(list2);
-	//cudaFree(listT);
 	cudaFree(progress_d);
 
+	free(temp);
 	free(progress_h);
 
-
-	return 1;
+	return 0;
 }

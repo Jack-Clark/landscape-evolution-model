@@ -465,5 +465,5 @@ int process_SFD_Multiple_Retries(Data* data, Data* device, int iter) {
 	free(temp);
 	free(numCellsRemaining_h);
 
-	return 1;
+	return 0;
 }

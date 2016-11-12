@@ -162,7 +162,6 @@ int main(int argc, char* argv[]) {
 		// undertake flow routing and compute catchments and contributing areas
 		setdevicespace_FD(&data, &device);
 			cuFlowDirection(&data, &device, &catchments, i);
-			calccontribA(&data, &device, &catchments); // calculate contributing area for each cell
 		cleardevicespace_FD(&data, &device);
 
 
@@ -175,7 +174,12 @@ int main(int argc, char* argv[]) {
 		// ****************************************  SFD   ****************************************************
 		printf("Entering FA: \n");
 		//accumulateflowSFD(&data, &device, i);
-		correctflow_SFD(&data, &device, i);
+		int err = correctflow_SFD(&data, &device, i, 4);
+		if(err) {
+			fprintf(data.outlog, "Exiting from main...\n");
+			printf("Exiting from main...\n");
+			exit(EXIT_FAILURE);
+		}
 		cleardevicespace_FA(&data, &device);
 
 			//correctflow_SFD_NoPart_List(data.fa, data.fd, data.mapInfo.width, data.mapInfo.height, data.runoffweight, data.WhichGrid);
@@ -283,4 +287,5 @@ int main(int argc, char* argv[]) {
 	free(data.start_year);
 	fclose(data.outlog);
 
+	exit(EXIT_SUCCESS);
 }
