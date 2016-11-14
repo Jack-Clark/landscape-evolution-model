@@ -1,10 +1,9 @@
 #Landscape Evolution Modelling
 
-This repository contains most of my work from my research internship at The School of Engineering and Computer Science, Durham University. 
+This repository contains most of the work from my research internship at The School of Engineering and Computer Science, Durham University. 
 It is only a fraction of the project's codebase, however due to potential licensing issues the full code must remain in a private repository,
 and therefore I am only able to show my own code.
 
-The code in this repository contains fast GPU algorithms for computing the flow accumulation from a single flow direction grid and a grid of runoff weights.
+The code in this repository contains fast GPU algorithms for computing the flow accumulation from a single flow direction grid and a grid of runoff weights, which is a fundamental part of landscape evolution modelling, and the performance limiter as the grid size grows.
 Before starting my internship, the fastest algorithm was the [SFD_NoPart_List algorithm](https://github.com/Jack-Clark/landscape-evolution-model/blob/master/parallel-SFD-List.cu), 
-which is an optimised version of the correct flow algorithm, described in [this paper](http://community.dur.ac.uk/stephen.mcgough/CV/Papers/2012/Land_paper.pdf). During the internship, 
-I managed to redesign the algorithm, making it 2x faster. The faster version is called the [Multiple Retries algorithm](https://github.com/Jack-Clark/landscape-evolution-model/blob/master/process_SFD_multiple_retries.cu).
+which is an optimised version of the correct flow algorithm, described in [this paper](http://community.dur.ac.uk/stephen.mcgough/CV/Papers/2012/Land_paper.pdf). As described in the paper, the correctflow algorithm computes 99% of the grid's FA very quickly, however takes almost two orders of magnitude longer to compute the last 1%, becoming essentially sequential. During the internship, I managed to redesign the algorithm, so that for example, a grid taking ~17000 iterations to complete would only take ~400 iterations to complete, which on the grid it was tested on, made it 2x faster than the original correctflow algorithm. The faster version is called the [Multiple Retries algorithm](https://github.com/Jack-Clark/landscape-evolution-model/blob/master/process_SFD_multiple_retries.cu). This result is particularly beneficial, because as the grid size grows, the flow accumulation computation time becomes responsible for >99% of the runtime, therefore doubling the speed of the FA algorithm leads to ~2x speedup of the whole computation.
