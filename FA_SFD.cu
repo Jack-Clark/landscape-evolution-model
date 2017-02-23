@@ -11,7 +11,7 @@ int correctflow_SFD(Data* data, Data* device, int iter, int algorithmID) {
 
 	cudaEvent_t start, stop;
 	float time;
-    int rows = data->mapInfo.height;
+    	int rows = data->mapInfo.height;
 	int cols = data->mapInfo.width;
 	int totalCells = rows * cols;
 
