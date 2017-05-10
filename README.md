@@ -1,4 +1,4 @@
-#Landscape Evolution Modelling#
+# Landscape Evolution Modelling
 
 This repository contains most of the work from my research internship at The School of Engineering and Computer Science, Durham University. However due to potential licensing issues the full code must remain in a private repository, and therefore this is only a fraction of the project's codebase.
 
