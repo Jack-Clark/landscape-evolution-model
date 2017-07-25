@@ -1,5 +1,5 @@
 /**
-	This is the optimised versino of the NoPart List flow accumulation algorithm. It sets a baseline for performance.
+	This is the optimised version of the NoPart List flow accumulation algorithm. It sets a baseline for performance.
 **/
 
 
